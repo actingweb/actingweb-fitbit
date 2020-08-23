@@ -1,0 +1,23 @@
+version: '3.4'
+
+services:
+
+  fitbit:
+    build: .
+    environment:
+      - AWS_ACCESS_KEY_ID=dummy
+      - AWS_SECRET_ACCESS_KEY=dummy
+      - AWS_DB_PREFIX=fitbit
+      - AWS_DB_HOST=http://dynamodb:8000
+      - APP_HOST_FQDN=greger.ngrok.io
+      - APP_HOST_PROTOCOL=https://
+    volumes:
+      - .:/src
+    ports:
+      - 5000:5000
+
+  dynamodb:
+    image: deangiberson/aws-dynamodb-local
+    command: -port 8000 -sharedDb
+    ports:
+      - 8000:8000

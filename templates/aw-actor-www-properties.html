@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Welcome to the Army Knife</title>
+
+    <link rel='stylesheet prefetch'
+          href='https://cdnjs.cloudflare.com/ajax/libs/materialize/0.97.6/css/materialize.min.css'>
+    <link rel='stylesheet prefetch' href='https://fonts.googleapis.com/icon?family=Material+Icons'>
+    <link rel='stylesheet prefetch'
+          href='https://fonts.googleapis.com/css?family=Architects+Daughter|Roboto&subset=latin,devanagari'>
+    <link rel='stylesheet prefetch' href='https://maxcdn.bootstrapcdn.com/font-awesome/4.5.0/css/font-awesome.min.css'>
+
+    <link rel="stylesheet" href="/fitbit/static/style.css" )>
+
+
+</head>
+
+<body class="welcome">
+
+<main class="valign-wrapper">
+    <span class="container grey-text text-darken-1 ">
+    <table>
+    <tr><td>IDENTITY</td><td>{{ id }}</td><td></td></tr>
+    <tr><td>Property</td><td>Value</td><td>DELETE</td></tr>
+{% for k,v in properties.items() %}
+    <tr>
+    <td>{{ k }}</td>
+    <td>{{ v }}</td>
+    <td><a href="{{ url }}properties/{{ k }}?_method=DELETE">Delete</a></td>
+    </td>
+{% endfor %}
+    </table>
+
+
+        <footer class="page-footer deep-purple lighten-5">
+      <div class="container grey-text text-darken-3">Support: <a href="mailto:support@greger.io">support@greger.io</a>
+          &nbsp;&nbsp;Copyright &copy; 2018 - Greger Wedel<br>&nbsp;
+    </div>
+  </footer>
+    </span>
+</main>
+</body>
+<script src='http://cdnjs.cloudflare.com/ajax/libs/jquery/2.2.2/jquery.min.js'></script>
+<script src='https://cdnjs.cloudflare.com/ajax/libs/materialize/0.97.6/js/materialize.min.js'></script>
+
+
+</body>
+
+</html>
+
+
