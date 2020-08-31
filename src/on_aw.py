@@ -1,9 +1,10 @@
 import logging
 import json
 import time
-from actingweb import on_aw
+from actingweb import on_aw, attribute
+from src import fitbit, cdf
 
-PROP_HIDE = []
+PROP_HIDE = [] #['cdp_api_key']
 
 PROP_PROTECT = PROP_HIDE + [
 ]
@@ -194,4 +195,9 @@ class OnAWFitbit(on_aw.OnAWBase):
         # if path == 'something':
         #    return True
         # END OF SAMPLE CODE
+        if path == 'cron':
+            fb = fitbit.Fitbit(self.myself, self.config, self.auth)
+            res = fb.load()
+            cog = cdf.Cognite(me=self.myself, project="gregerwedel", environment="greenfield")
+            return json.dumps(res)
         return False

@@ -418,12 +418,6 @@ def app_oauth_callback():
         return Response(status=404)
     return h.get_response()
 
-
-@app.route('/google91d73b3ba8074162.html', methods=['GET'], strict_slashes=False)
-def app_google_verify():
-    return Response("google-site-verification: google91d73b3ba8074162.html")
-
-
 if __name__ == "__main__":
     logging.debug('Starting up the Fitbit mail actor ...')
     # Only for debugging while developing

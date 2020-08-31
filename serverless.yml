@@ -24,6 +24,7 @@ custom:
 
 provider:
   name: aws
+  endpointType: REGIONAL
   runtime: python3.7
   memorySize: 128
   timeout: 30

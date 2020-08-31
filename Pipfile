@@ -12,9 +12,10 @@ name = "pypitest"
 Jinja2 = "*"
 Flask = "*"
 uWSGI = "*"
-actingweb = {path = "./../actingweb", editable = true}
+#actingweb = {path = "./../actingweb", editable = true}
 #actingweb = {version="*", index="pypitest"}
-#actingweb = "*"
+actingweb = "*"
+cognite-sdk = "*"
 
 
 [dev-packages]
