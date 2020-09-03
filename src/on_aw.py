@@ -198,6 +198,9 @@ class OnAWFitbit(on_aw.OnAWBase):
         if path == 'cron':
             fb = fitbit.Fitbit(self.myself, self.config, self.auth)
             res = fb.load()
-            cog = cdf.Cognite(me=self.myself, project="gregerwedel", environment="greenfield")
+            tuples = fb.make_tuples(res)
+            cog = cdf.Cognite(me=self.myself, project="gregerwedel", environment="greenfield", 
+                ts_name="heartrate_fitbit", ts_ext_id="fitbit_" + self.myself.id)
+            cog.ingest_timeseries(tuples)
             return json.dumps(res)
         return False

@@ -64,12 +64,27 @@ class Fitbit:
         res = self.auth.oauth_get(url)
         return res
 
+    def make_tuples(self, datapoints=None):
+        if not datapoints:
+            return []
+        ret = list()
+        for i in datapoints:
+            ts = datetime.datetime.now().replace(hour=0, minute=0, second=0, microsecond=0) + \
+                datetime.timedelta(
+                    hours=int(i['time'][0:2]), 
+                    minutes=int(i['time'][3:5]),
+                    seconds=int(i['time'][6:8])
+                )
+            item = (ts, i['value'])
+            ret.append(tuple(item))
+        return ret
+
     def load(self):
         if not self.myconf.get('save', None):
             self.my_config(save=True)
         save = self.myconf['save']
         if save: 
-            # Get and save last 10 minutes
+            # Get and save last 5 minutes
             res = self.get_heartrate(datetime.datetime.now() - datetime.timedelta(minutes=5))
             last_datapoints = res.get('activities-heart-intraday', {}).get('dataset', [{}])
             self.myself.property.heartrate = json.dumps(last_datapoints)
@@ -77,7 +92,8 @@ class Fitbit:
         if self.myself.property.last_load:
             last_load = datetime.datetime.strptime(self.myself.property.last_load, '%Y-%m-%dT%H:%M')
         else:
-            last_load = datetime.datetime.now() - datetime.timedelta(days=1)
+            last_load = datetime.datetime.now() - datetime.timedelta(hours=23, minutes=59)
         res = self.get_heartrate(last_load)
+        res = res.get('activities-heart-intraday', {}).get('dataset', [{}])
         self.myself.property.last_load = datetime.datetime.now().strftime('%Y-%m-%dT%H:%M')
-        return res.get('activities-heart-intraday', {}).get('dataset', [{}])
+        return res
