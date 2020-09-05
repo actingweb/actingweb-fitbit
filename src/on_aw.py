@@ -1,10 +1,11 @@
 import logging
 import json
 import time
+import datetime
 from actingweb import on_aw, attribute
 from src import fitbit, cdf
 
-PROP_HIDE = [] #['cdp_api_key']
+PROP_HIDE = ['cdf_api_key']
 
 PROP_PROTECT = PROP_HIDE + [
 ]
@@ -186,21 +187,55 @@ class OnAWFitbit(on_aw.OnAWBase):
         return {}
 
     def www_paths(self, path=''):
-        # THIS METHOD IS CALLED WHEN AN actorid/www/* PATH IS CALLED (AND AFTER ACTINGWEB
-        # DEFAULT PATHS HAVE BEEN HANDLED)
-        # THE BELOW IS SAMPLE CODE
-        # if path == '' or not myself:
-        #    logging.info('Got an on_www_paths without proper parameters.')
-        #    return False
-        # if path == 'something':
-        #    return True
-        # END OF SAMPLE CODE
         if path == 'cron':
+            # Keep last load for return values
+            last_load = self.myself.property.last_load
             fb = fitbit.Fitbit(self.myself, self.config, self.auth)
-            res = fb.load()
-            tuples = fb.make_tuples(res)
-            cog = cdf.Cognite(me=self.myself, project="gregerwedel", environment="greenfield", 
-                ts_name="heartrate_fitbit", ts_ext_id="fitbit_" + self.myself.id)
-            cog.ingest_timeseries(tuples)
-            return json.dumps(res)
+            if fb.myconf.get('save', False):
+                self.myself.property.heartrate = json.dumps(fb.load_lastten())
+            if self.myself.property.last_load:
+                start = datetime.datetime.strptime(self.myself.property.last_load, '%Y-%m-%dT%H:%M')
+            else:
+                start = datetime.datetime.now() - datetime.timedelta(days=1)
+            res = fb.load(start)
+            self.myself.property.last_load = datetime.datetime.now().strftime('%Y-%m-%dT%H:%M')
+            if fb.myconf.get('ingest', False):
+                cog = cdf.Cognite(me=self.myself, project="gregerwedel", environment="greenfield", 
+                    ts_name="heartrate_fitbit", ts_ext_id="fitbit_" + self.myself.id)
+                cog.ingest_timeseries(res)
+            feedback = {
+                'last_load': last_load,
+                'count': len(res),
+                'save': fb.myconf.get('save', False),
+                'ingest': fb.myconf.get('ingest', False)
+            }
+            return json.dumps(feedback)
+        if path == 'backfill':
+            # Keep last load for return values
+            last_load = self.myself.property.last_load
+            days = self.myself.property.backfill_days
+            if not days:
+                days = 3
+            start = datetime.datetime.now() - datetime.timedelta(days=days)
+            fb = fitbit.Fitbit(self.myself, self.config, self.auth)
+            if fb.myconf.get('ingest', False):
+                cog = cdf.Cognite(me=self.myself, project="gregerwedel", environment="greenfield", 
+                    ts_name="heartrate_fitbit", ts_ext_id="fitbit_" + self.myself.id)
+            else:
+                return False
+            count = 0
+            while (start < datetime.datetime.now()):
+                res = fb.load_day(start)
+                count = count + len(res)
+                cog.ingest_timeseries(res)
+                days = days - 1
+                start = datetime.datetime.now() - datetime.timedelta(days=days)
+            feedback = {
+                'last_load': last_load,
+                'count': count,
+                'save': fb.myconf.get('save', False),
+                'ingest': fb.myconf.get('ingest', False)
+            }
+            self.myself.property.last_load = datetime.datetime.now().strftime('%Y-%m-%dT%H:%M')
+            return json.dumps(feedback)
         return False

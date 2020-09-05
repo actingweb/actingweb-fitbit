@@ -27,7 +27,7 @@ class Cognite:
             self.environment = None
         self.api_key = self.myself.property.cdf_api_key
         self.client = CogniteClient(api_key=self.api_key, project=project, 
-            client_name="actingweb_fitbit_v1", base_url=url, debug=False)
+            client_name="actingweb_fitbit_v1", base_url=url, debug=True)
         status = self.client.login.status()
         if status.logged_in:
             self.is_ok = True
