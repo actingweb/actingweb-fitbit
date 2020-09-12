@@ -11,9 +11,9 @@ RUN mkdir -p /var/cache/apk \
 RUN apk update \
     && apk add --no-cache -u build-base linux-headers libffi-dev libressl-dev \
     && pip install --upgrade pip && pip install pipenv
-COPY . /src
 RUN pipenv install --system --ignore-pipfile
-RUN pipenv install --system --dev
+#RUN pipenv install --system --dev
 RUN apk cache clean
+COPY . /src
 EXPOSE 5000
 ENTRYPOINT ["/src/run.sh"]

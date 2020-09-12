@@ -11,6 +11,7 @@ services:
       - AWS_DB_HOST=http://dynamodb:8000
       - APP_HOST_FQDN=greger.ngrok.io
       - APP_HOST_PROTOCOL=https://
+      - ACTINGWEB_PAYLOAD=
     volumes:
       - .:/src
     ports:

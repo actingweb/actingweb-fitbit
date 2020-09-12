@@ -1,0 +1,11 @@
+{
+  "resource": "/{proxy+}",
+  "path": "/cron",
+  "httpMethod": "GET",
+  "body": "",
+  "headers": {
+    "Accept": "*.*",
+    "User-Agent": "Cloudwatch"
+   },
+  "requestContext": {}
+}

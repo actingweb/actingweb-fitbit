@@ -4,10 +4,11 @@ import json
 import logging
 from urllib.parse import urlparse
 from flask import Flask, request, redirect, Response, render_template
-from actingweb import config, aw_web_request, actor
+from actingweb import config, aw_web_request, actor, auth
 from src import on_aw
 from actingweb.handlers import callbacks, properties, meta, root, trust, devtest, \
     subscription, resources, oauth, callback_oauth, bot, www, factory
+from src import store, fargate
 # To debug in pycharm inside the Docker container, remember to uncomment import pydevd as well
 # (and add to requirements.txt)
 # import pydevd_pycharm
@@ -94,7 +95,7 @@ class SimplifyRequest:
                 self._req['path'] = urlparse(req['url']).path
         else:
             cookies = {}
-            raw_cookies = req.headers.get("Cookie")
+            raw_cookies = req.headers.get("Cookie", None)
             if raw_cookies:
                 for cookie in raw_cookies.split("; "):
                     name, value = cookie.split("=")
@@ -126,6 +127,7 @@ class Handler:
 
     def __init__(self, req):
         req = SimplifyRequest(req)
+        self.req = req
         self.handler = None
         self.response = None
         self.actor_id = None
@@ -418,7 +420,54 @@ def app_oauth_callback():
         return Response(status=404)
     return h.get_response()
 
+def run_cron():
+    st = store.GlobalStore(id=None, config=get_config())
+    attrs = st.get_bucket("cron")
+    res = list()
+    for i in attrs:
+        this_actor = actor.Actor(actor_id=i["id"], config=get_config())
+        this_auth = auth.Auth(actor_id=i["id"], config=get_config())
+        res.append(on_aw.run_cron(this_actor, config=get_config(), auth=this_auth))
+    if res:
+        return json.dumps(res)
+    return None
+
+@app.route('/cron', methods=['GET'], strict_slashes=False)
+def app_cron():
+    h = Handler(request)
+    if not fargate.in_fargate() and not fargate.fargate_disabled():
+        fargate.fork_container(h.webobj.request, '')
+        return json.dumps({'fargate': True})
+    return Response(status=204)
+
+def run_backfill(actor_id=None):
+    if not actor_id:
+        return None
+    this_actor = actor.Actor(actor_id=actor_id, config=get_config())
+    this_auth = auth.Auth(actor_id=actor_id, config=get_config())
+    res=on_aw.run_backfill(this_actor, config=get_config(), auth=this_auth)
+    if res:
+        return json.dumps(res)
+    return None
+
 if __name__ == "__main__":
-    logging.debug('Starting up the Fitbit mail actor ...')
-    # Only for debugging while developing
-    app.run(host='0.0.0.0', debug=True, port=5000)
+
+    logging.info("Starting up ActingWeb Fitbit actor...")
+    actor_id = os.getenv('ACTINGWEB_ACTOR', None)
+    payload = os.getenv('ACTINGWEB_PAYLOAD', None)
+
+    if payload:
+        logging.debug("Found payload!")
+        h = Handler(fargate.get_request(payload))
+        if '/www/backfill' in h.req.path:
+            logging.info('Starting /www/backfill processing...')
+            res = run_backfill(actor_id)
+            logging.info("Result of backfill: " + res)
+        elif '/cron' in h.req.path:
+            logging.info('Starting /cron processing...')
+            res = run_cron()
+            logging.info("Result of cron: " + res)
+    else:
+        logging.debug('Starting up the Fitbit mail actor ...')
+        # Only for debugging while developing
+        app.run(host='0.0.0.0', debug=True, port=5000)

@@ -3,13 +3,72 @@ import json
 import time
 import datetime
 from actingweb import on_aw, attribute
-from src import fitbit, cdf
+from src import fitbit, cdf, store, fargate
 
 PROP_HIDE = ['cdf_api_key']
 
 PROP_PROTECT = PROP_HIDE + [
 ]
 
+# Run a job to save 10 latest heartbeats and ingest into CDF
+def run_cron(me=None, config=None, auth=None):
+    if not me or not config or not auth:
+        return False
+    # Keep last load for return values
+    last_load = me.property.last_load
+    fb = fitbit.Fitbit(me, config, auth)
+    if fb.myconf.get('save', False):
+        me.property.heartrate = json.dumps(fb.load_lastten())
+    if me.property.last_load:
+        start = datetime.datetime.strptime(me.property.last_load, '%Y-%m-%dT%H:%M')
+    else:
+        start = datetime.datetime.now() - datetime.timedelta(days=1)
+    res = fb.load(start)
+    me.property.last_load = datetime.datetime.now().strftime('%Y-%m-%dT%H:%M')
+    if fb.myconf.get('ingest', False):
+        cog = cdf.Cognite(me=me, project="gregerwedel", environment="greenfield", 
+            ts_name="heartrate_fitbit", ts_ext_id="fitbit_" + me.id)
+        cog.ingest_timeseries(res)
+    return {
+        'id': me.id,
+        'last_load': last_load,
+        'count': len(res),
+        'save': fb.myconf.get('save', False),
+        'ingest': fb.myconf.get('ingest', False)
+    }
+
+# Run a backfill using backfill_days property for number of days and ingest into CDF
+def run_backfill(me=None, config=None, auth=None):
+    if not me or not config or not auth:
+        return False
+    # Keep last load for return values
+    last_load = me.property.last_load    
+    fb = fitbit.Fitbit(me, config, auth)
+    if fb.myconf.get('ingest', False):
+        cog = cdf.Cognite(me=me, project="gregerwedel", environment="greenfield", 
+            ts_name="heartrate_fitbit", ts_ext_id="fitbit_" + me.id)
+    else:
+        return False
+    try:
+        days = int(fb.myconf.get('backfill_days', 3))
+    except:
+        days = 3
+    logging.info("Backfilling days: " + str(days))
+    start = datetime.datetime.now() - datetime.timedelta(days=days)
+    count = 0
+    while (start < datetime.datetime.now()):
+        res = fb.load_day(start)
+        count = count + len(res)
+        cog.ingest_timeseries(res)
+        days = days - 1
+        start = datetime.datetime.now() - datetime.timedelta(days=days)
+    me.property.last_load = datetime.datetime.now().strftime('%Y-%m-%dT%H:%M')
+    return {
+        'last_load': last_load,
+        'count': count,
+        'save': fb.myconf.get('save', False),
+        'ingest': fb.myconf.get('ingest', False)
+    }
 
 class OnAWFitbit(on_aw.OnAWBase):
 
@@ -152,6 +211,9 @@ class OnAWFitbit(on_aw.OnAWBase):
 
     def actions_on_oauth_success(self):
         # THIS METHOD IS CALLED WHEN AN OAUTH AUTHORIZATION HAS BEEN SUCCESSFULLY MADE
+        # Register to do a cron job
+        st = store.GlobalStore(id=self.myself.id, config=self.config)
+        st.set_attr("cron", {"enable": True})
         return True
 
     def get_resources(self, name):
@@ -188,54 +250,10 @@ class OnAWFitbit(on_aw.OnAWBase):
 
     def www_paths(self, path=''):
         if path == 'cron':
-            # Keep last load for return values
-            last_load = self.myself.property.last_load
-            fb = fitbit.Fitbit(self.myself, self.config, self.auth)
-            if fb.myconf.get('save', False):
-                self.myself.property.heartrate = json.dumps(fb.load_lastten())
-            if self.myself.property.last_load:
-                start = datetime.datetime.strptime(self.myself.property.last_load, '%Y-%m-%dT%H:%M')
-            else:
-                start = datetime.datetime.now() - datetime.timedelta(days=1)
-            res = fb.load(start)
-            self.myself.property.last_load = datetime.datetime.now().strftime('%Y-%m-%dT%H:%M')
-            if fb.myconf.get('ingest', False):
-                cog = cdf.Cognite(me=self.myself, project="gregerwedel", environment="greenfield", 
-                    ts_name="heartrate_fitbit", ts_ext_id="fitbit_" + self.myself.id)
-                cog.ingest_timeseries(res)
-            feedback = {
-                'last_load': last_load,
-                'count': len(res),
-                'save': fb.myconf.get('save', False),
-                'ingest': fb.myconf.get('ingest', False)
-            }
-            return json.dumps(feedback)
+            return json.dumps(run_cron(self.myself, self.config, self.auth))
         if path == 'backfill':
-            # Keep last load for return values
-            last_load = self.myself.property.last_load
-            days = self.myself.property.backfill_days
-            if not days:
-                days = 3
-            start = datetime.datetime.now() - datetime.timedelta(days=days)
-            fb = fitbit.Fitbit(self.myself, self.config, self.auth)
-            if fb.myconf.get('ingest', False):
-                cog = cdf.Cognite(me=self.myself, project="gregerwedel", environment="greenfield", 
-                    ts_name="heartrate_fitbit", ts_ext_id="fitbit_" + self.myself.id)
-            else:
-                return False
-            count = 0
-            while (start < datetime.datetime.now()):
-                res = fb.load_day(start)
-                count = count + len(res)
-                cog.ingest_timeseries(res)
-                days = days - 1
-                start = datetime.datetime.now() - datetime.timedelta(days=days)
-            feedback = {
-                'last_load': last_load,
-                'count': count,
-                'save': fb.myconf.get('save', False),
-                'ingest': fb.myconf.get('ingest', False)
-            }
-            self.myself.property.last_load = datetime.datetime.now().strftime('%Y-%m-%dT%H:%M')
-            return json.dumps(feedback)
+            if not fargate.in_fargate() and not fargate.fargate_disabled():
+                fargate.fork_container(self.webobj.request, self.myself.id)
+                return json.dumps({'fargate': True})
+            return json.dumps(run_backfill(self.myself, self.config, self.auth))
         return False
