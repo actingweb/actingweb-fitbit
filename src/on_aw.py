@@ -7,7 +7,7 @@ from src import fitbit, cdf, store, fargate
 
 PROP_HIDE = ['cdf_api_key']
 
-PROP_PROTECT = PROP_HIDE + [
+PROP_PROTECT = [
 ]
 
 # Run a job to save 10 latest heartbeats and ingest into CDF
