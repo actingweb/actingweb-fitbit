@@ -39,37 +39,39 @@ provider:
     AWS_DB_PREFIX: ${self:custom.db_prefix}
     AWS_FARGATE_REGION: 'us-west-2'
     AWS_FARGATE_CLUSTER: 'default'
-    AWS_FARGATE_TASK: ''
+    AWS_FARGATE_TASK: 'fitbit-fargate-dev'
     AWS_FARGATE_SEC_GROUP: ''
     AWS_FARGATE_SUBNET1: ''
     AWS_FARGATE_SUBNET2: ''
     #FARGATE_DISABLE: 'True'
     APP_OAUTH_ID: ''
     APP_OAUTH_KEY: ''
-  iamRoleStatements:
-    - Effect: Allow
-      Action:
-        - dynamodb:Query
-        - dynamodb:Scan
-        - dynamodb:GetItem
-        - dynamodb:PutItem
-        - dynamodb:UpdateItem
-        - dynamodb:DeleteItem
-        - dynamodb:CreateTable
-        - dynamodb:DescribeTable
-      Resource: "arn:aws:dynamodb:${opt:region, self:provider.region}:*:table/${self:custom.db_prefix}_*"
-    - Effect: "Allow"
-      Action:
-        - ecs:RunTask
-      Resource: "*"
-    - Effect: Allow
-      Action:
-        - iam:PassRole
-      Resource: ${self:custom.execRoleArn}
+  iam:
+    role:
+      statements:
+        - Effect: Allow
+          Action:
+            - dynamodb:Query
+            - dynamodb:Scan
+            - dynamodb:GetItem
+            - dynamodb:PutItem
+            - dynamodb:UpdateItem
+            - dynamodb:DeleteItem
+            - dynamodb:CreateTable
+            - dynamodb:DescribeTable
+          Resource: "arn:aws:dynamodb:${opt:region, self:provider.region}:*:table/${self:custom.db_prefix}_*"
+        - Effect: "Allow"
+          Action:
+            - ecs:RunTask
+          Resource: "*"
+        - Effect: Allow
+          Action:
+            - iam:PassRole
+          Resource: ${self:custom.execRoleArn}
 
 functions:
   app:
     handler: wsgi_handler.handler
     events:
       - http: ANY /
-      - http: 'ANY {proxy+}'
+      - http: 'ANY /{proxy+}'
